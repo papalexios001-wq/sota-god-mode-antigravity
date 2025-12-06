@@ -1164,68 +1164,91 @@ export class MaintenanceEngine {
             }
         }
 
-        // 6. ALEX HORMOZI STYLE TEXT ENHANCEMENT (for remaining content)
-        this.logCallback(`✍️ POLISHING: Content style (punchy, actionable, no fluff)...`);
+        // 6. GOD MODE ULTRA INSTINCT (The Final Layer)
+        this.logCallback(`⚡ ENGAGING ULTRA INSTINCT: Transmuting content DNA...`);
 
-        const priorityNodes = Array.from(body.querySelectorAll('p, li, h2, h3, h4')).filter(node => {
-            if (node.closest('figure, .wp-block-image, .wp-block-embed, .key-takeaways-box, .faq-section')) return false;
+        // Filter for "Meaty" content nodes (paragraphs and list items that actually say something)
+        const contentNodes = Array.from(body.querySelectorAll('p, li, h2, h3')).filter(node => {
+            // Skip protected/special elements
+            if (node.closest('figure, .wp-block-image, .wp-block-embed, .key-takeaways-box, .faq-section, .sota-references-section')) return false;
             if (node.querySelector('img, iframe, video, svg')) return false;
-            if (node.textContent?.trim().length < 20) return false;
 
-            const text = node.textContent?.toLowerCase() || '';
-            const priority =
-                text.includes('2020') || text.includes('2021') || text.includes('2022') ||
-                text.includes('2023') || text.includes('2024') || text.includes('2025') ? 10 :
-                node.tagName === 'H2' || node.tagName === 'H3' ? 8 :
-                text.length > 200 ? 7 :
-                text.split(' ').some(w => w.length > 15) ? 6 :
-                3;
+            // Skip navigation/UI noise
+            if ((node.textContent?.trim().length || 0) < 40) return false;
 
-            return priority >= 5;
+            return true;
         });
 
-        const BATCH_SIZE = 5;
+        // We process larger chunks to give the AI more "Context Window" to work with.
+        // This allows it to move flow between paragraphs better.
+        const INSTINCT_BATCH_SIZE = 8;
+        let transmutationCount = 0;
         let textChangesMade = 0;
-        const MAX_NODES = 15;
-        const nodesToProcess = priorityNodes.slice(0, MAX_NODES);
 
-        for (let i = 0; i < nodesToProcess.length; i += BATCH_SIZE) {
-            const batch = nodesToProcess.slice(i, i + BATCH_SIZE);
-            const batchText = batch.map(n => n.outerHTML).join('\n\n');
+        // Process the most critical parts of the article (Top 40 nodes) to save tokens but maximize impact
+        const nodesToTransmute = contentNodes.slice(0, 40);
+
+        for (let i = 0; i < nodesToTransmute.length; i += INSTINCT_BATCH_SIZE) {
+            const batch = nodesToTransmute.slice(i, i + INSTINCT_BATCH_SIZE);
+
+            // Create a virtual container to hold the batch
+            const batchWrapper = doc.createElement('div');
+            batch.forEach(node => batchWrapper.appendChild(node.cloneNode(true)));
+
+            const batchHtml = batchWrapper.innerHTML;
 
             try {
-                const improvedBatchHtml = await memoizedCallAI(
+                this.logCallback(`⚡ TRANSMUTING: Sector ${Math.floor(i/INSTINCT_BATCH_SIZE) + 1}...`);
+
+                const godModeHtml = await memoizedCallAI(
                     apiClients, selectedModel, geoTargeting, openrouterModels, selectedGroqModel,
-                    'dom_content_polisher',
-                    [batchText, semanticKeywords],
+                    'god_mode_ultra_instinct',
+                    [batchHtml, semanticKeywords, page.title],
                     'html'
                 );
 
-                const cleanBatch = surgicalSanitizer(improvedBatchHtml);
+                const cleanGodHtml = surgicalSanitizer(godModeHtml);
 
-                if (cleanBatch && cleanBatch.length > 20) {
+                // Sanity Check: Ensure we didn't lose too much content (Anti-Hallucination)
+                if (cleanGodHtml && cleanGodHtml.length > batchHtml.length * 0.6) {
                     const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = cleanBatch;
+                    tempDiv.innerHTML = cleanGodHtml;
 
-                    if (tempDiv.childElementCount === batch.length) {
-                        batch.forEach((node, index) => {
-                            const newNode = tempDiv.children[index];
-                            if (newNode && node.tagName === newNode.tagName) {
-                                const oldText = node.textContent || '';
-                                const newText = newNode.textContent || '';
-                                const changeRatio = Math.abs(newText.length - oldText.length) / Math.max(oldText.length, 1);
-                                if (changeRatio > 0.05 || oldText !== newText) {
-                                    node.innerHTML = newNode.innerHTML;
-                                    textChangesMade++;
-                                }
-                            }
-                        });
+                    // Re-injection Strategy:
+                    // The AI might merge paragraphs or split them. We replace the ENTIRE batch range.
+                    if (tempDiv.children.length > 0) {
+                         const firstNode = batch[0];
+                         const parent = firstNode.parentNode;
+
+                         if (parent) {
+                             // Insert new transmuted nodes
+                             Array.from(tempDiv.childNodes).forEach(newChild => {
+                                 parent.insertBefore(newChild, firstNode);
+                             });
+
+                             // Delete old weak nodes
+                             batch.forEach(oldNode => {
+                                 if (oldNode.parentNode === parent) {
+                                     parent.removeChild(oldNode);
+                                 }
+                             });
+
+                             transmutationCount++;
+                             textChangesMade += batch.length;
+                         }
                     }
                 }
             } catch (e: any) {
-                this.logCallback(`⚠️ Text enhancement error: ${e.message}`);
+                // If God Mode fails, we fail gracefully and keep original content
+                this.logCallback(`⚠️ Ultra Instinct disruption: ${e.message}`);
             }
+            // Cooldown to respect API limits
             await delay(500);
+        }
+
+        if (transmutationCount > 0) {
+             structuralFixesMade++;
+             this.logCallback(`✅ ULTRA INSTINCT COMPLETE: Transmuted ${transmutationCount} content sectors.`);
         }
 
         // 7. ULTRA AGGRESSIVE REFERENCE CHECK & ADDITION
