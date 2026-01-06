@@ -105,12 +105,12 @@ const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wp
 
         // WATERFALL STRATEGY: From Strict to General to guarantee results
         const queries = [
-            // Tier 1: High Quality / Data Driven
+            // Tier 1: High Quality / Data Driven (Strict)
             `${keyword} "research" "data" "statistics" ${CURRENT_YEAR} -site:youtube.com -site:pinterest.com -site:quora.com`,
             // Tier 2: Guides & Tutorials (Broad)
             `${keyword} "guide" "tutorial" "best practices" ${CURRENT_YEAR - 1}..${CURRENT_YEAR + 1} -site:youtube.com`,
-            // Tier 3: General Topic (Fallback)
-            `${keyword} -site:youtube.com -site:facebook.com -site:instagram.com`
+            // Tier 3: General Topic (Fallback) - Removed restrictive site exclusions to ensure results
+            `${keyword}`
         ];
 
         const validLinks: any[] = [];
@@ -132,6 +132,7 @@ const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wp
 
                 // Parallel Validation for speed
                 const validationPromises = potentialLinks.map(async (link: any) => {
+                    // Pre-check limits to save bandwidth
                     if (validLinks.length >= TARGET_COUNT) return null;
                     if (!link.link) return null;
 
@@ -143,24 +144,28 @@ const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wp
 
                         // Skip competitors, low quality & user's own domain
                         if (domain.includes(userDomain)) return null;
-                        if (["linkedin.com", "pinterest.com", "facebook.com", "youtube.com"].some(d => domain.includes(d))) return null;
+                        if (["linkedin.com", "pinterest.com", "facebook.com", "youtube.com", "instagram.com", "twitter.com"].some(d => domain.includes(d))) return null;
+
+                        // Soft 404 Prevention: Check URL pattern
+                        if (link.link.toLowerCase().includes('404') || link.link.toLowerCase().includes('not-found')) return null;
 
                         seenUrls.add(link.link);
 
-                        // Content validation with fast timeout (3s)
-                        const checkRes = await Promise.race([
-                            fetchWithProxies(link.link, {
-                                method: "HEAD",
-                                headers: {
-                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                                }
-                            }),
-                            new Promise<Response>((_, reject) =>
-                                setTimeout(() => reject(new Error('timeout')), 3000)
-                            )
-                        ]) as Response;
+                        // SOTA VALIDATION: GET request (not HEAD) with Range header to verify existence without full download
+                        // This prevents "Soft 404" issues where HEAD returns 200 but page is broken
+                        const checkRes = await fetchWithProxies(link.link, {
+                            method: "GET",
+                            headers: {
+                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                                "Range": "bytes=0-1024" // Only request first 1KB
+                            }
+                        });
 
-                        if (checkRes.status === 200) {
+                        if (checkRes.ok && checkRes.status === 200) {
+                            // Double check final URL for redirects to 404 pages
+                            const finalUrl = checkRes.url.toLowerCase();
+                            if (finalUrl.includes('404') || finalUrl.includes('not-found') || finalUrl.includes('error')) return null;
+
                             return {
                                 title: link.title,
                                 url: link.link,
