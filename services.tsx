@@ -223,14 +223,15 @@ export const fetchVerifiedReferenceData = async (keyword: string, serperApiKey: 
 export const fetchVerifiedReferences = async (keyword: string, serperApiKey: string, wpUrl?: string): Promise<string> => {
     if (!serperApiKey) return "";
     try {
-        const filtered = await fetchVerifiedReferenceData(keyword, serperApiKey, 25); // Request more to ensure we get 8+
+        const filtered = await fetchVerifiedReferenceData(keyword, serperApiKey, 25);
 
         // Filter out WP domain if provided
         const finalLinks = wpUrl
             ? filtered.filter(l => !l.source.includes(new URL(wpUrl).hostname.replace('www.', '')))
             : filtered;
 
-        if (finalLinks.length < 8) return ""; // ENFORCE: Minimum 8 references
+        // CHANGED: Add whatever references we find (at least 1)
+        if (finalLinks.length === 0) return "";
 
         const listItems = finalLinks.slice(0, 12).map(ref =>
             `<li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" title="Verified Source: ${ref.source}" style="text-decoration: underline; color: #2563EB;">${ref.title}</a> <span style="color:#64748B; font-size:0.8em;">(${ref.source})</span></li>`
@@ -1007,7 +1008,6 @@ Return ONLY the conclusion text (no headings, just paragraphs).`;
 
     private async addReferencesSection(body: HTMLElement, title: string, doc: Document): Promise<void> {
         this.logCallback(`✅ ADDING: References section with 8-12 verified links...`);
-
         const serperApiKey = this.currentContext?.serperApiKey;
         // Generate high-quality reference URLs based on the article topic
         const references = await this.generateHighQualityReferences(title, serperApiKey);
@@ -1017,10 +1017,7 @@ Return ONLY the conclusion text (no headings, just paragraphs).`;
             return;
         }
 
-        if (references.length < 8) {
-            this.logCallback(`⚠️ Only ${references.length} references generated (minimum 8 required). Skipping section.`);
-            return;
-        }
+        this.logCallback(`📚 Found ${references.length} references, adding to content...`);
 
         const listItems = references.slice(0, 12).map(ref => `<li><a href="${ref.url}" target="_blank" rel="noopener noreferrer" style="color: #2563EB; text-decoration: underline; font-weight: 600;">${ref.title}</a> <span style="color:#64748B; font-size:0.8em;">(${ref.description})</span></li>`).join('');
 
@@ -1610,8 +1607,8 @@ ${finalLinks.map(ref => `  <li><a href="${ref.url}" target="_blank" rel="noopene
 
                 this.logCallback(`📊 VALIDATION SUMMARY: ${validatedLinks.length} valid, ${checkedCount - validatedLinks.length} failed, ${skippedCount} skipped (same domain)`);
 
-                if (validatedLinks.length >= 8) {
-                    this.logCallback(`✅ SUCCESS: ${validatedLinks.length} operational reference links validated (all 200 status)`);
+                if (validatedLinks.length > 0) {
+                    this.logCallback(`✅ SUCCESS: ${validatedLinks.length} operational reference links validated`);
                     this.logCallback(`📝 REFERENCE LINKS:`);
                     validatedLinks.slice(0, 3).forEach((ref, i) => {
                         this.logCallback(`   ${i + 1}. ${ref.source} - ${ref.title.substring(0, 60)}...`);
