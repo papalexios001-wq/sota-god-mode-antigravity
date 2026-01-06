@@ -20,7 +20,7 @@ class ServerGuard {
     async wait() {
         const now = Date.now();
         const timeSinceLast = now - this.lastRequestTime;
-        
+
         if (timeSinceLast < this.currentDelay) {
             const waitTime = this.currentDelay - timeSinceLast;
             console.log(`[ServerGuard] Cooling down for ${waitTime}ms...`);
@@ -47,60 +47,60 @@ export const serverGuard = new ServerGuard();
  * and improve performance within a session.
  */
 class ContentCache {
-  private cache = new Map<string, {data: any, timestamp: number}>();
-  private TTL = 3600000; // 1 hour
-  
-  set(key: string, data: any) {
-    this.cache.set(key, {data, timestamp: Date.now()});
-  }
-  
-  get(key: string): any | null {
-    const item = this.cache.get(key);
-    if (item && Date.now() - item.timestamp < this.TTL) {
-      console.log(`[Cache] HIT for key: ${key.substring(0, 30)}...`);
-      return item.data;
+    private cache = new Map<string, { data: any, timestamp: number }>();
+    private TTL = 3600000; // 1 hour
+
+    set(key: string, data: any) {
+        this.cache.set(key, { data, timestamp: Date.now() });
     }
-    return null;
-  }
+
+    get(key: string): any | null {
+        const item = this.cache.get(key);
+        if (item && Date.now() - item.timestamp < this.TTL) {
+            console.log(`[Cache] HIT for key: ${key.substring(0, 30)}...`);
+            return item.data;
+        }
+        return null;
+    }
 }
 export const apiCache = new ContentCache();
 
 // SOTA PERFORMANCE ENGINE v5.0
 // 1. PERSISTENT CACHE (survives session)
 class PersistentCache {
-  private storage = localStorage;
-  
-  set(key: string, data: any, ttl: number = 86400000) { // 24h default
-    const item = {
-      data,
-      expiry: Date.now() + ttl
-    };
-    try {
-        this.storage.setItem(`wcop_${key}`, JSON.stringify(item));
-    } catch (e) {
-        console.error("Failed to write to persistent cache (localStorage full?):", e);
+    private storage = localStorage;
+
+    set(key: string, data: any, ttl: number = 86400000) { // 24h default
+        const item = {
+            data,
+            expiry: Date.now() + ttl
+        };
+        try {
+            this.storage.setItem(`wcop_${key}`, JSON.stringify(item));
+        } catch (e) {
+            console.error("Failed to write to persistent cache (localStorage full?):", e);
+        }
     }
-  }
-  
-  get(key: string): any | null {
-    const item = this.storage.getItem(`wcop_${key}`);
-    if (!item) return null;
-    
-    try {
-      const parsed = JSON.parse(item);
-      if (Date.now() > parsed.expiry) {
-        this.storage.removeItem(`wcop_${key}`);
-        return null;
-      }
-      return parsed.data;
-    } catch {
-      return null;
+
+    get(key: string): any | null {
+        const item = this.storage.getItem(`wcop_${key}`);
+        if (!item) return null;
+
+        try {
+            const parsed = JSON.parse(item);
+            if (Date.now() > parsed.expiry) {
+                this.storage.removeItem(`wcop_${key}`);
+                return null;
+            }
+            return parsed.data;
+        } catch {
+            return null;
+        }
     }
-  }
-  
-  has(key: string): boolean {
-    return this.get(key) !== null;
-  }
+
+    has(key: string): boolean {
+        return this.get(key) !== null;
+    }
 }
 
 export const persistentCache = new PersistentCache();
@@ -108,7 +108,7 @@ export const persistentCache = new PersistentCache();
 // 3. LAZY SCHEMA GENERATION (generate only when needed)
 export const lazySchemaGeneration = (content: GeneratedContent, wpConfig: WpConfig, siteInfo: SiteInfo, geoTargeting: ExpandedGeoTargeting) => {
     let schemaCache: string | null = null;
-    
+
     return () => {
         if (!schemaCache) {
             schemaCache = generateSchemaMarkup(
@@ -122,12 +122,12 @@ export const lazySchemaGeneration = (content: GeneratedContent, wpConfig: WpConf
 // 4. CONNECTION POOLING
 class AIClientPool {
     private clients: Map<string, any> = new Map();
-    
+
     get(clientType: string, apiKey: string) {
         const key = `${clientType}_${apiKey.slice(-8)}`;
         return this.clients.get(key);
     }
-    
+
     set(clientType: string, apiKey: string, client: any) {
         const key = `${clientType}_${apiKey.slice(-8)}`;
         this.clients.set(key, client);
@@ -157,15 +157,15 @@ export const extractJson = (text: string): string => {
     if (!text || typeof text !== 'string') {
         throw new Error("Input text is invalid or empty.");
     }
-    
+
     try {
         JSON.parse(text);
         return text;
     } catch (e: any) { }
 
     let cleanedText = text
-        .replace(/^```(?:json)?\s*/, '') 
-        .replace(/\s*```$/, '')           
+        .replace(/^```(?:json)?\s*/, '')
+        .replace(/\s*```$/, '')
         .trim();
 
     cleanedText = cleanedText.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
@@ -173,7 +173,7 @@ export const extractJson = (text: string): string => {
 
     const firstBracket = cleanedText.indexOf('{');
     const firstSquare = cleanedText.indexOf('[');
-    
+
     if (firstBracket === -1 && firstSquare === -1) {
         throw new Error("No JSON object/array found. Ensure your prompt requests JSON output only without markdown.");
     }
@@ -184,10 +184,10 @@ export const extractJson = (text: string): string => {
     else startIndex = Math.min(firstBracket, firstSquare);
 
     let potentialJson = cleanedText.substring(startIndex);
-    
+
     const startChar = potentialJson[0];
     const endChar = startChar === '{' ? '}' : ']';
-    
+
     let balance = 1;
     let inString = false;
     let escapeNext = false;
@@ -232,7 +232,7 @@ export const extractJson = (text: string): string => {
  * SOTA Self-Healing JSON Parser.
  */
 export async function parseJsonWithAiRepair(
-    text: string, 
+    text: string,
     aiRepairer: (brokenText: string) => Promise<string>
 ): Promise<any> {
     try {
@@ -268,7 +268,7 @@ export const sanitizeHtmlResponse = (rawHtml: string): string => {
     const firstTagIndex = cleanedHtml.indexOf('<');
     if (firstTagIndex > 0) {
         const pretext = cleanedHtml.substring(0, firstTagIndex).trim();
-        if (pretext.length > 0 && pretext.length < 150) { 
+        if (pretext.length > 0 && pretext.length < 150) {
             cleanedHtml = cleanedHtml.substring(firstTagIndex);
         }
     }
@@ -280,7 +280,7 @@ export const sanitizeHtmlResponse = (rawHtml: string): string => {
     if (explanationMatch && explanationMatch.index !== undefined) {
         cleanedHtml = cleanedHtml.substring(0, explanationMatch.index).trim();
     }
-    
+
     // 3. Fallback: If "```" remains at the end, kill it
     cleanedHtml = cleanedHtml.replace(/```\s*$/, '');
 
@@ -336,8 +336,8 @@ export const resolveFinalUrl = async (url: string): Promise<string> => {
         return response.url || url;
     } catch (e) {
         try {
-             const response = await fetchWithProxies(url, { method: 'GET' });
-             return response.url || url;
+            const response = await fetchWithProxies(url, { method: 'GET' });
+            return response.url || url;
         } catch (e2) {
             return url;
         }
@@ -348,19 +348,19 @@ export const resolveFinalUrl = async (url: string): Promise<string> => {
  * SOTA LINK VALIDATOR & FIXER
  */
 export const validateAndFixUrl = async (
-    originalUrl: string, 
-    contextQuery: string, 
+    originalUrl: string,
+    contextQuery: string,
     serperApiKey: string
 ): Promise<{ valid: boolean, url: string | null, fixed: boolean }> => {
-    
+
     let isValid = false;
     try {
         const checkRes = await fetchWithProxies(originalUrl, { method: 'HEAD' });
         if (checkRes.ok) {
             isValid = true;
         } else if (checkRes.status === 405 || checkRes.status === 403) {
-             const getRes = await fetchWithProxies(originalUrl, { method: 'GET' });
-             if (getRes.ok) isValid = true;
+            const getRes = await fetchWithProxies(originalUrl, { method: 'GET' });
+            if (getRes.ok) isValid = true;
         }
     } catch (e) {
         isValid = false;
@@ -406,7 +406,7 @@ export const callAiWithRetry = async (apiCall: () => Promise<any>, maxRetries = 
             if (isNonRetriable) throw error;
 
             if (attempt === maxRetries - 1) throw error;
-            
+
             const backoff = Math.pow(2, attempt) * 1000 + initialDelay;
             await new Promise(resolve => setTimeout(resolve, backoff));
         }
@@ -419,8 +419,25 @@ export const callAiWithRetry = async (apiCall: () => Promise<any>, maxRetries = 
  * INTEGRATES SERVER GUARD TO PREVENT CPU SPIKES.
  */
 export const fetchWordPressWithRetry = async (targetUrl: string, options: RequestInit): Promise<Response> => {
-    const REQUEST_TIMEOUT = 45000; 
-    const hasAuthHeader = options.headers && (options.headers as Headers).has('Authorization');
+    const REQUEST_TIMEOUT = 45000;
+
+    // ENTERPRISE FIX: Defensively check for Authorization header across all header types
+    let hasAuthHeader = false;
+    if (options.headers) {
+        if (typeof options.headers === 'object' && options.headers !== null) {
+            // Check if .has() method exists (Headers instance)
+            if (typeof (options.headers as any).has === 'function') {
+                hasAuthHeader = (options.headers as Headers).has('Authorization');
+            } else if (Array.isArray(options.headers)) {
+                // Array format: [['Authorization', 'value']]
+                hasAuthHeader = options.headers.some((pair: any) => pair[0].toLowerCase() === 'authorization');
+            } else {
+                // Plain object format: { Authorization: 'value' }
+                const headers = options.headers as Record<string, string>;
+                hasAuthHeader = Object.keys(headers).some(k => k.toLowerCase() === 'authorization');
+            }
+        }
+    }
 
     // SERVER GUARD: Enforce cooldown before sending any WP request
     await serverGuard.wait();
@@ -492,7 +509,7 @@ export async function processConcurrently<T>(
                 await processor(item);
                 completed++;
                 onProgress?.(completed, total);
-                
+
                 // SOTA SAFETY: Force a small sleep between queue items to yield CPU
                 await new Promise(r => setTimeout(r, 1000));
             }
